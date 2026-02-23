@@ -68,6 +68,17 @@ contract TMXTribeTest is BaseTest {
             FSTLP.balanceOf(address(ATTACKER)),
             18
         );
+
+        (bool s8, bytes memory aums) = glpManager.call(
+            abi.encodeWithSignature("getAums()")
+        );
+        require(s8, "Get Aums failed");
+        emit log_named_decimal_uint(
+            "Before Swap Get Aums",
+            abi.decode(aums, (uint256[]))[0],
+            18
+        );
+
         // 2. Swap
         address[] memory path1 = new address[](2);
         path1[0] = address(USDT_TOKEN);
@@ -88,6 +99,15 @@ contract TMXTribeTest is BaseTest {
             "After Swap",
             USDG.balanceOf(address(ATTACKER)),
             6
+        );
+        (bool s9, bytes memory aums2) = glpManager.call(
+            abi.encodeWithSignature("getAums()")
+        );
+        require(s9, "Get Aums failed");
+        emit log_named_decimal_uint(
+            "After Swap Get Aums",
+            abi.decode(aums2, (uint256[]))[0],
+            18
         );
 
         // 3. Unstake and Redeem
