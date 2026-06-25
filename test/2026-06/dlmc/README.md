@@ -7,7 +7,7 @@
 - **Tx hash**: [`0x151025d3f0a782340a74d30ef33a5fad044b838e74437a803f0652e70c231306`](https://bscscan.com/tx/0x151025d3f0a782340a74d30ef33a5fad044b838e74437a803f0652e70c231306)
 - **Block**: 106091607
 - **Economic reproduction**: unpriced — raw PoC proof passed, but USD comparison is incomplete.
-- **Elapsed analysis time**: 575.97s (575972 ms)
+- **Elapsed analysis time**: 569.08s (569076 ms)
 - **Detected at**: 2026-06-25T01:35:10+00:00
 - **Original alert**: https://x.com/TenArmorAlert/status/2069957542109958498
 
@@ -26,25 +26,25 @@
 
 ## Root Cause
 
-- **Finding**: DLMC buy rewards were converted at stale price and then repriced with contract-held minted supply excluded
-- **In short**: DLMCToken buy(uint256) derives minted principal DLMC from attacker-controlled amountQuote and the old livePrice, mints that principal to address(this), then _distributeReferralBonusOnBuy converts a 5% USDT-denominated re...
+- **Finding**: DLMC buy/sell accounting allowed flash-funded entitlement redemption for excess USDT
+- **In short**: The vulnerable path is the `buy(uint256)` flow; it violated the value/accounting invariant below.
 - **Severity**: `critical`
-- **Confidence**: `high`
-- **Violated invariant**: Sellable DLMC reward entitlement must be priced against a denominator that includes the supply minted to create the entitlement, or the reward must remain capped to its original USDT-denominated value.
+- **Confidence**: `medium`
+- **Violated invariant**: DLMC redemption value must be bounded by a correct reserve/price/share formula and must not let transient buy-side entitlement withdraw more USDT than its economically valid share.
 
-DLMCToken buy(uint256) derives minted principal DLMC from attacker-controlled amountQuote and the old livePrice, mints that principal to address(this), then _distributeReferralBonusOnBuy converts a 5% USDT-denominated referral bonus into DLMC at the same stale livePrice. _updatePrice then counts the new USDT reserve but subtracts the contract-held minted pri...
+The supported cause is in DLMC buy/sell accounting during the exploit transaction. The attacker used a Pancake callback to register affiliates, approve USDT, call DLMC buy(uint256) twice, and then call sell(uint256); the buy frames expanded DLMC totalSupply and balances, and the sell frame redeemed a smaller DLMC amount for a large USDT payout.
 
 Mechanism:
 
-- The exploit entered through `PancakePair.swap(uint256,uint256,address,bytes) callback into DLMCToken buy(uint256)/sell(uint256)` before reaching the vulnerable accounting path.
-- That path trusted attacker-controlled state while performing protected accounting updates.
-- The accounting update violated the invariant: Sellable DLMC reward entitlement must be priced against a denominator that includes the supply minted to create the entitlement, or the reward must remain capped to its original USDT-denominated value.
+- The attacker reached the victim through the `buy(uint256)` flow during the exploit.
+- The supported cause is in DLMC buy/sell accounting during the exploit transaction.
+- The accounting update violated the invariant: DLMC redemption value must be bounded by a correct reserve/price/share formula and must not let transient buy-side entitlement withdraw more USDT than its economically valid share.
 
 Key evidence:
 
-- PoC status, forge build, forge test, and economic reproduction all passed.
-- Places the flash swap callback, DLMC register/buy calls, livePrice/balance reads, sell call, repayment, and profit transfer in execution order.
-- Verified PoC performs flash swap, two register/approve/buy sequences, sell of DLMC, repayment, and USDT profit transfer.
+- PoC replay, build, test, and economic reproduction all pass.
+- Trace flow enters Pancake callback, calls DLMC buy/sell path, and reports USDT and DLMC profit legs.
+- PoC performs the swap callback, DLMC registrations, USDT approvals, two DLMC buys, DLMC sell, pair repayment, and USDT profit transfer.
 
 ## Affected Contracts
 
@@ -54,4 +54,5 @@ Key evidence:
 
 ## Limitations
 
-- Analysis is limited to available evidence for this transaction; no external exploit reports or historical context were used.
+- DLMC source is absent from [internal artifact], so the exact vulnerable function body, helper formula, branch, and missing guard cannot be named.
+- [internal artifact] reconstructs the outer call sequence but not the internal DLMC pricing, mint, affiliate, or redemption calculation.
