@@ -6,7 +6,7 @@ import "./Base.sol";
 // @KeyInfo - Total Lost : N/A
 // Attacker : 0x74c4a756933d0f713facb1dea325ef511646c3b1
 // Attack Contract : 0x4adbddea5781caccadd9f73f00e07201b541414e
-// Vulnerable Contract : N/A
+// Vulnerable Contract : 0xf2ca2a3572b26ae7c479dc7ae36d922113b1bdf2
 // Attack Tx : 0x151025d3f0a782340a74d30ef33a5fad044b838e74437a803f0652e70c231306
 // Block : 106091607
 // Chain : BSC
@@ -14,8 +14,8 @@ import "./Base.sol";
 //
 // @Reproduction
 // Verdict : pass
-// Economic Proof : attacker_profit_reproduction
-// Reproduced Value : N/A
+// Economic Proof : beneficial_payout_reproduction
+// Reproduced Value : 221.88K USD
 //
 // @POC Author
 // Generated PoC

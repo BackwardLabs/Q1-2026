@@ -6,7 +6,7 @@
 - **Chain**: bsc (chain_id=56)
 - **Tx hash**: [`0x151025d3f0a782340a74d30ef33a5fad044b838e74437a803f0652e70c231306`](https://bscscan.com/tx/0x151025d3f0a782340a74d30ef33a5fad044b838e74437a803f0652e70c231306)
 - **Block**: 106091607
-- **Economic reproduction**: unpriced — raw PoC proof passed, but USD comparison is incomplete.
+- **Economic reproduction**: pass — selected priced beneficial payout reproduced 222,560.221693 USDT (~$221,878.75) with an exact profit-oracle USD comparison.
 - **Elapsed analysis time**: 779.67s (779674 ms)
 - **Detected at**: 2026-06-25T01:35:10+00:00
 - **Original alert**: https://x.com/TenArmorAlert/status/2069957542109958498
@@ -15,14 +15,17 @@
 
 - **Estimated loss**: $222600.00
 - **Funds valued at**: 2026-06-24T11:15:10Z (price as of block N-1, pre-hack)
-- **Main affected assets**: unknown
-- **Attacker gain reproduced**: unknown
+- **Main affected assets**: USDT
+- **Attacker gain reproduced**: 222,560.221693 USDT (~$221,878.75)
 
 ## Reproduction
 
 - **PoC status**: `verified`
 - **Forge test**: `pass`
 - **Proof kind**: `economic_proof`
+- **Selected economic proof**: `beneficial_payout_reproduction`
+- **USD comparison basis**: `incident_profit_oracle_usd` (`ratio=1.0`)
+- **Selection note**: the direct attacker-surface DLMC residual is unpriced, so the report uses the priced USDT terminal payout as the selected lower-bound proof and does not sum both legs.
 
 ## Root Cause
 
@@ -55,4 +58,5 @@ Key evidence:
 ## Limitations
 
 - The result.json top-level profit_token and profit_delta fields are null, so profit values are taken from attack_flow.md and asset/RPC deltas.
+- The direct attacker-surface DLMC residual has no historical USD price; it is retained as supporting context, not the selected USD comparison leg.
 - No historical prior transactions were used by design; the selected root cause is in-transaction and source-visible.
