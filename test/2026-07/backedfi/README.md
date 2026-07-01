@@ -7,7 +7,7 @@
 - **Tx hash**: [`0xe2320086b2815d21b0927839bd0e306466c29a68d38d5361e99dd21ec5472612`](https://etherscan.io/tx/0xe2320086b2815d21b0927839bd0e306466c29a68d38d5361e99dd21ec5472612)
 - **Block**: 25434062
 - **Economic reproduction**: exact — PoC reproduces 99–101% of incident net loss.
-- **Elapsed analysis time**: 891.40s (891404 ms)
+- **Elapsed analysis time**: 935.99s (935994 ms)
 - **Detected at**: 2026-07-01T01:30:57+00:00
 - **Original alert**: https://x.com/TenArmorAlert/status/2072130807356129726
 
@@ -27,35 +27,35 @@
 
 ## Root Cause
 
-- **Finding**: Pool borrow accounting allowed repeated wrapped-token debt expansion against insufficient current collateral
-- **In short**: The vulnerable path is the `borrow(wGOOGLx,1414889025557658614,2,0,attacker)` flow; it violated the value/accounting invariant below.
+- **Finding**: Lending pool accepted recursive borrowed wGOOGLx as collateral and allowed over-borrowing
+- **In short**: The vulnerable path is the `borrow(address,uint256,uint256,uint16,address) then attacker selector 0xc1d5a727 supplying wGOOGLx` flow; it violated the value/accounting invariant below.
 - **Severity**: `critical`
 - **Confidence**: `medium`
-- **Violated invariant**: Every borrow must be bounded by the borrower's current collateral value and health after prior borrows and collateral-equivalent token movements in the same transaction.
+- **Violated invariant**: Borrowed assets must not be immediately re-counted as fresh collateral in a way that increases effective borrowing power beyond post-action health, oracle valuation, isolation, and solvency constraints.
 
-The Backed/Aave-style pool proxy at 0x3eeeb3cd20f844a578807fc457388ceb9a67faa6 accepted repeated borrow calls after a USDC supply while the attacker recycled borrowed wGOOGLx through another attacker contract. The transaction minted large variable-debt balances and transferred wrapped assets/USDC to the attacker, indicating the borrow path accepted an invali...
+The root cause is attacker-controlled state reaching protected accounting updates.
 
 Mechanism:
 
-- The attacker reached the victim through the `borrow(wGOOGLx,1414889025557658614,2,0,attacker)` flow during the exploit.
-- The Backed/Aave-style pool proxy at 0x3eeeb3cd20f844a578807fc457388ceb9a67faa6 accepted repeated borrow calls after a USDC supply while the attacker recycled borrowed wGOOGLx through another attacker contract.
-- The accounting update violated the invariant: Every borrow must be bounded by the borrower's current collateral value and health after prior borrows and collateral-equivalent token movements in the same transaction.
+- The attacker reached the victim through the `borrow(address,uint256,uint256,uint16,address) then attacker selector 0xc1d5a727 supplying wGOOGLx` flow during the exploit.
+- That path trusted attacker-controlled state while performing protected accounting updates.
+- The accounting update violated the invariant: Borrowed assets must not be immediately re-counted as fresh collateral in a way that increases effective borrowing power beyond post-action health, oracle valuation, isolation, and solvency constraints.
 
 Key evidence:
 
-- PoC verification gate passed for status, execution, economic reproduction, forge build, and forge test.
-- Lists realized losses of wSPYx, wQQQx, wNVDAx, wMSTRx, USDC, and wTSLAx.
-- Shows protocol/storage holder losses and matching attacker/helper gains, including debt-token positive deltas.
+- PoC execution, economic proof, Forge build, and Forge test all passed.
+- Top frames are pool-called debt/eToken mint/accounting frames tied to giant supply expansion, not raw transfer frames.
+- The PoC supplies USDC, loops borrow(wGOOGLx) plus supply(wGOOGLx), then borrows USDC and wrapped equities.
 
 ## Affected Contracts
 
 | Address | Name | Role |
 |---|---|---|
-| `0x3eeeb3cd20f844a578807fc457388ceb9a67faa6` | `InitializableImmutableAdminUpgradeabilityProxy` | `primary vulnerable pool proxy` |
-| `0x41d25b8918d3dc4de807d56fd43a82854036714b` | `variableDebtwGOOGLx` | `debt-token entitlement/effect contract` |
-| `0x0ec96784aa6f47e456e0ce4eb2a8b00f1a6c9b74` | `ewGOOGLx` | `wrapped/debt-token effect contract in repeated borrow path` |
+| `0x3eeeb3cd20f844a578807fc457388ceb9a67faa6` | `unknown lending pool proxy` | `primary vulnerable contract` |
+| `0xc84577a366bdc6ace161388dace77ff0a8958b9a` | `VariableDebtToken` | `downstream debt-token implementation` |
+| `0xb0c626f9c25418ba16132e5ae33cf54e61f8242f` | `AToken` | `downstream eToken implementation` |
 
 ## Limitations
 
-- missing_pool_implementation_source: victim_sources contains only the proxy source for 0x3eeeb3cd20f844a578807fc457388ceb9a67faa6, while the implementation 0xf7ba2c2b2e3b8c3c327b632e6bdff77840f06b34 is absent.
-- source_or_pseudocode_branch_gap: the exact borrow validation/account-data/oracle/health-factor branch is not present in supplied source or pseudocode.
+- pool health/oracle/solvency validation branch is not source-visible in supplied artifacts
+- pool_validation_source_gap: no victim_sources directory for implementation 0xf7ba2c2b2e3b8c3c327b632e6bdff77840f06b34
