@@ -7,7 +7,7 @@
 - **Tx hash**: [`0xb1a43313b51512b45fc5d921838a8a6427266f4326e5d82cde7cdbe02daa3349`](https://etherscan.io/tx/0xb1a43313b51512b45fc5d921838a8a6427266f4326e5d82cde7cdbe02daa3349)
 - **Block**: 25467373
 - **Economic reproduction**: exact — PoC reproduces 99–101% of incident net loss.
-- **Elapsed analysis time**: 808.56s (808564 ms)
+- **Elapsed analysis time**: 746.64s (746641 ms)
 - **Detected at**: 2026-07-06T06:28:44+00:00
 
 ## Impact
@@ -25,35 +25,34 @@
 
 ## Root Cause
 
-- **Finding**: Verified profit path, but no source-backed vulnerable branch is established
-- **In short**: The artifacts prove a profitable sequence using PoolManager unlock/take/sync/settle, Uniswap v2 swap, Uniswap v3 swap, WETH withdraw, and AVAIL/WETH transfers.
-- **Severity**: `medium`
+- **Finding**: No patchable vulnerable branch is supported by the supplied artifacts
+- **In short**: The verified PoC reproduces attacker profit through a PoolManager unlock flow, V2 swap, PoolManager swap, V3 swap callback payment, and WETH withdrawal.
+- **Severity**: `low`
 - **Confidence**: `low`
-- **Violated invariant**: Not established by supplied closed-world evidence.
+- **Violated invariant**: Unknown: no supplied source, pseudocode, trace, or RPC evidence proves that a PoolManager, V3, V2, ERC20, oracle, or accounting invariant was violated.
 
-The artifacts prove a profitable sequence using PoolManager unlock/take/sync/settle, Uniswap v2 swap, Uniswap v3 swap, WETH withdraw, and AVAIL/WETH transfers. They do not prove that any selected contract branch violated an invariant: PoolManager enforces transient settlement at unlock exit, Uniswap v3 verifies callback payment, Uniswap v2 enforces its adjus...
+The verified PoC reproduces attacker profit through a PoolManager unlock flow, V2 swap, PoolManager swap, V3 swap callback payment, and WETH withdrawal. However, source-visible PoolManager settlement checks and V3 callback repayment checks are not shown to fail or be bypassed, and the current artifact impact table has no negative victim deltas.
 
 Mechanism:
 
-- The exploit entered through `attacker selector 0x00000002 / fallback dispatch` before reaching the vulnerable accounting path.
-- The artifacts prove a profitable sequence using PoolManager unlock/take/sync/settle, Uniswap v2 swap, Uniswap v3 swap, WETH withdraw, and AVAIL/WETH transfers.
-- The accounting update violated the invariant: Not established by supplied closed-world evidence.
+- The exploit entered through `0x00000002` before reaching the vulnerable accounting path.
+- The verified PoC reproduces attacker profit through a PoolManager unlock flow, V2 swap, PoolManager swap, V3 swap callback payment, and WETH withdrawal.
+- The accounting update violated the invariant: Unknown: no supplied source, pseudocode, trace, or RPC evidence proves that a PoolManager, V3, V2, ERC20, oracle, or accounting invariant was violated.
 
 Key evidence:
 
-- PoC status is pass.
-- PoC verification gates passed and the reproduced economic effect records attacker ETH gain of 53.817927899908925564 ETH.
-- PoC sequence uses PoolManager unlock/take/sync/settle, v2 swap, PoolManager swap, v3 swap callback, WETH settlement, and WETH withdraw.
+- PoC, execution, economic status, forge build, and forge test all passed.
+- Trace sequence shows PoolManager unlock/callback, take, V2 swap, settle, PoolManager swap, V3 swap path, and reproduced ETH profit.
+- Artifact records positive attacker and infrastructure deltas but no negative victim delta rows in the current transaction.
 
 ## Affected Contracts
 
 | Address | Name | Role |
 |---|---|---|
-| `0x000000000004444c5dc75cb358380d2e3de08a90` | `PoolManager` | `candidate accounting and flash-settlement contract; no vulnerable branch proven` |
-| `0x80f8143fa056a063aaeecec3323aa3426262ddb2` | `UniswapV3Pool` | `candidate AMM price/accounting contract; no vulnerable branch proven` |
-| `0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852` | `UniswapV2Pair` | `intermediate AMM pair used in path; no vulnerable branch proven` |
+| `0x000000000004444c5dc75cb358380d2e3de08a90` | `PoolManager` | `protocol accounting contract exercised by the PoC; vulnerable role unproven` |
+| `0x80f8143fa056a063aaeecec3323aa3426262ddb2` | `UniswapV3Pool` | `swap pool used in the profit path; vulnerable role unproven` |
 
 ## Limitations
 
-- No direct negative victim delta is present in the frontier for this transaction.
-- The supplied artifacts do not establish a contract + function/branch + failed invariant + trigger + effect root cause.
+- tx_scope_gap: current impact artifacts show attacker profit but no direct negative victim delta rows.
+- the decisive PoolManager swap execution is not trace-backed in the PoC handoff and is marked as storage-only.
